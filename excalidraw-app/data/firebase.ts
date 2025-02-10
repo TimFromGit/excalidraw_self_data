@@ -25,6 +25,7 @@ import { getSyncableElements } from ".";
 import type { ResolutionType } from "../../packages/excalidraw/utility-types";
 import type { Socket } from "socket.io-client";
 import type { RemoteExcalidrawElement } from "../../packages/excalidraw/data/reconcile";
+import { loadFilesFromStorage } from "./api";
 
 // private
 // -----------------------------------------------------------------------------
@@ -289,22 +290,15 @@ export const saveToFirebase = async (
   return storedElements;
 };
 
-export const loadFromFirebase = async (
+export const loadFromFirebase = async ( //переписан await
   roomId: string,
   roomKey: string,
   socket: Socket | null,
 ): Promise<readonly SyncableExcalidrawElement[] | null> => {
-  const firebase = await loadFirestore();
-  const db = firebase.firestore();
 
-  const docRef = db.collection("scenes").doc(roomId);
-  const doc = await docRef.get();
-  if (!doc.exists) {
-    return null;
-  }
-  const storedScene = doc.data() as FirebaseStoredScene;
+  const decryptedElements = await loadFilesFromStorage(); 
   const elements = getSyncableElements(
-    restoreElements(await decryptElements(storedScene, roomKey), null),
+    restoreElements(decryptedElements as any, null),
   );
 
   if (socket) {
@@ -331,7 +325,7 @@ export const loadFilesFromFirebase = async (
         const response = await fetch(`${url}?alt=media`);
         if (response.status < 400) {
           const arrayBuffer = await response.arrayBuffer();
-
+          console.log(arrayBuffer) //?????
           const { data, metadata } = await decompressData<BinaryFileMetadata>(
             new Uint8Array(arrayBuffer),
             {
