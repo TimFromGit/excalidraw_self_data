@@ -108,6 +108,7 @@ export const loadFirebaseStorage = async () => {
     await firebaseStoragePromise;
     firebaseStoragePromise = true;
   }
+  debugger;
   return firebase;
 };
 
@@ -177,9 +178,9 @@ export const saveFilesToFirebase = async ({
   files: { id: FileId; buffer: Uint8Array }[];
 }) => {
   const firebase = await loadFirebaseStorage();
-
   const erroredFiles: FileId[] = [];
   const savedFiles: FileId[] = [];
+  debugger;
 
   await Promise.all(
     files.map(async ({ id, buffer }) => {
@@ -212,6 +213,7 @@ const createFirebaseSceneDocument = async (
 ) => {
   const sceneVersion = getSceneVersion(elements);
   const { ciphertext, iv } = await encryptElements(roomKey, elements);
+  debugger;
   return {
     sceneVersion,
     ciphertext: firebase.firestore.Blob.fromUint8Array(
@@ -297,6 +299,7 @@ export const loadFromFirebase = async ( //переписан await
 ): Promise<readonly SyncableExcalidrawElement[] | null> => {
 
   const decryptedElements = await loadFilesFromStorage(); 
+  debugger;
   const elements = getSyncableElements(
     restoreElements(decryptedElements as any, null),
   );
