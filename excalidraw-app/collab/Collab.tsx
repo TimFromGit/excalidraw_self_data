@@ -170,31 +170,32 @@ class Collab extends PureComponent<CollabProps, CollabState> {
           throw new AbortError();
         }
         const storageBackend = await getStorageBackend();
-        const { savedFiles, erroredFiles } = await storageBackend.saveFilesToStorageBackend({
-          prefix: `${FIREBASE_STORAGE_PREFIXES.collabFiles}/${roomId}`,
-          files: await encodeFilesForUpload({
-            files: addedFiles,
-            encryptionKey: roomKey,
-            maxBytes: FILE_UPLOAD_MAX_BYTES,
-          }),
-        });
+        const { savedFiles, erroredFiles } =
+          await storageBackend.saveFilesToStorageBackend({
+            prefix: `${FIREBASE_STORAGE_PREFIXES.collabFiles}/${roomId}`,
+            files: await encodeFilesForUpload({
+              files: addedFiles,
+              encryptionKey: roomKey,
+              maxBytes: FILE_UPLOAD_MAX_BYTES,
+            }),
+          });
 
         return {
-          savedFiles: savedFiles.reduce(
+          savedFiles: Array.from(savedFiles).reduce(
             (acc: Map<FileId, BinaryFileData>, id) => {
-              const fileData = addedFiles.get(id);
+              const fileData = addedFiles.get(id[0]);
               if (fileData) {
-                acc.set(id, fileData);
+                acc.set(id[0], fileData);
               }
               return acc;
             },
             new Map(),
           ),
-          erroredFiles: erroredFiles.reduce(
+          erroredFiles: Array.from(erroredFiles).reduce(
             (acc: Map<FileId, BinaryFileData>, id) => {
-              const fileData = addedFiles.get(id);
+              const fileData = addedFiles.get(id[0]);
               if (fileData) {
-                acc.set(id, fileData);
+                acc.set(id[0], fileData);
               }
               return acc;
             },
@@ -327,7 +328,7 @@ class Collab extends PureComponent<CollabProps, CollabState> {
       this.resetErrorIndicator();
 
       if (this.isCollaborating() && storageBackend) {
-        this.handleRemoteSceneUpdate(this._reconcileElements(storageBackend));
+        this.handleRemoteSceneUpdate(this._reconcileElements(syncableElements));
       }
     } catch (error: any) {
       const errorMessage = /is longer than.*?bytes/.test(error.message)
@@ -498,9 +499,12 @@ class Collab extends PureComponent<CollabProps, CollabState> {
     }
 
     // TODO: `ImportedDataState` type here seems abused
+    // const scenePromise = resolvablePromise<
+    //   | (ImportedDataState & { elements: readonly OrderedExcalidrawElement[] })
+    //   | null
+    // >();
     const scenePromise = resolvablePromise<
-      | (ImportedDataState & { elements: readonly OrderedExcalidrawElement[] })
-      | null
+      (ImportedDataState & { elements: readonly ExcalidrawElement[] }) | null
     >();
 
     this.setIsCollaborating(true);
@@ -509,7 +513,6 @@ class Collab extends PureComponent<CollabProps, CollabState> {
     const { default: socketIOClient } = await import(
       /* webpackChunkName: "socketIoClient" */ "socket.io-client"
     );
-    const SOCKET_SERVER = await getEnv(EnvVar.SOCKET_SERVER_URL);
 
     const fallbackInitializationHandler = () => {
       this.initializeRoom({
@@ -522,8 +525,10 @@ class Collab extends PureComponent<CollabProps, CollabState> {
     this.fallbackInitializationHandler = fallbackInitializationHandler;
 
     try {
+      const SOCKET_SERVER = await getEnv(EnvVar.SOCKET_SERVER_URL);
+
       this.portal.socket = this.portal.open(
-        socketIOClient(import.meta.env.VITE_APP_WS_SERVER_URL, {
+        socketIOClient(SOCKET_SERVER, {
           transports: ["websocket", "polling"],
         }),
         roomId,

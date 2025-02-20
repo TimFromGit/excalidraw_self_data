@@ -456,8 +456,8 @@ const ExcalidrawWrapper = () => {
                 erroredFiles,
                 elements: excalidrawAPI.getSceneElementsIncludingDeleted(),
               });
-            // });
-          });
+              // });
+            });
         } else if (isInitialLoad) {
           if (fileIds.length) {
             LocalData.fileStorage

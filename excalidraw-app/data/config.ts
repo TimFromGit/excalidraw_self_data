@@ -1,11 +1,11 @@
 import { fetchEnv } from "./env";
-import {
-  isSavedToFirebase,
-  loadFilesFromFirebase,
-  loadFromFirebase,
-  saveFilesToFirebase,
-  saveToFirebase,
-} from "./firebase";
+// import {
+//   isSavedToFirebase,
+//   loadFilesFromFirebase,
+//   loadFromFirebase,
+//   saveFilesToFirebase,
+//   saveToFirebase,
+// } from "./firebase";
 import {
   isSavedToHttpStorage,
   loadFilesFromHttpStorage,
@@ -52,13 +52,13 @@ export async function getEnv(variable: EnvVar): Promise<string> {
   return result;
 }
 
-const firebaseStorage: StorageBackend = {
-  isSaved: isSavedToFirebase,
-  saveToStorageBackend: saveToFirebase,
-  loadFromStorageBackend: loadFromFirebase,
-  saveFilesToStorageBackend: saveFilesToFirebase,
-  loadFilesFromStorageBackend: loadFilesFromFirebase,
-};
+// const firebaseStorage: StorageBackend = {
+//   isSaved: isSavedToFirebase,
+//   saveToStorageBackend: saveToFirebase,
+//   loadFromStorageBackend: loadFromFirebase,
+//   saveFilesToStorageBackend: saveFilesToFirebase,
+//   loadFilesFromStorageBackend: loadFilesFromFirebase,
+// };
 
 const httpStorage: StorageBackend = {
   isSaved: isSavedToHttpStorage,
@@ -69,7 +69,7 @@ const httpStorage: StorageBackend = {
 };
 
 const storageBackends = new Map<string, StorageBackend>()
-  .set("firebase", firebaseStorage)
+  // .set("firebase", firebaseStorage)
   .set("http", httpStorage);
 
 export let storageBackend: StorageBackend | null = null;
@@ -85,7 +85,7 @@ export async function getStorageBackend() {
     storageBackend = storageBackends.get(storageBackendName) as StorageBackend;
   } else {
     console.warn("No storage backend found, default to firebase");
-    storageBackend = firebaseStorage;
+    // storageBackend = firebaseStorage;
   }
 
   return storageBackend;

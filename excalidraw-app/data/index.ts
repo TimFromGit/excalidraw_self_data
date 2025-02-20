@@ -311,7 +311,7 @@ export const exportToBackend = async (
 
     const response = await fetch(BACKEND_V2_POST, {
       method: "POST",
-      body: payload.buffer,
+      body: new Uint8Array(payload.buffer),
     });
     const json = await response.json();
     if (json.id) {
@@ -322,7 +322,7 @@ export const exportToBackend = async (
       const urlString = url.toString();
 
       const storageBackend = await getStorageBackend();
-      await storageBackend.saveFilesToStorageBackend({
+      await storageBackend?.saveFilesToStorageBackend({
         prefix: `/files/shareLinks/${json.id}`,
         files: filesToUpload,
       });

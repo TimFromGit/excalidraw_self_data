@@ -1,21 +1,32 @@
-import { MIME_TYPES } from "../../constants";
-import { decompressData } from "../../data/encode";
-import { IV_LENGTH_BYTES } from "../../data/encryption";
-import { restoreElements } from "../../data/restore";
-import { getSceneVersion } from "../../element";
-import { ExcalidrawElement, FileId } from "../../element/types";
-import { BinaryFileData, BinaryFileMetadata, DataURL } from "../../types";
-import Portal from "../collab/Portal";
+import { MIME_TYPES } from "../../packages/excalidraw/constants";
+import { decompressData } from "../../packages/excalidraw/data/encode";
+import { IV_LENGTH_BYTES } from "../../packages/excalidraw/data/encryption";
+import { restoreElements } from "../../packages/excalidraw/data/restore";
+import { getSceneVersion } from "../../packages/excalidraw/element";
+import type {
+  ExcalidrawElement,
+  FileId,
+} from "../../packages/excalidraw/element/types";
+import type {
+  BinaryFileData,
+  BinaryFileMetadata,
+  DataURL,
+} from "../../packages/excalidraw/types";
+import type Portal from "../collab/Portal";
 import { EnvVar, getEnv } from "./config";
 import { decryptElements, encryptElements } from "./firebase";
+import type { Socket } from "socket.io-client";
 
+// ...
+
+const httpStorageSceneVersionCache = new WeakMap<Socket, number>();
 // There is a lot of intentional duplication with the firebase file
 // to prevent modifying upstream files and ease futur maintenance of this fork
 
-const httpStorageSceneVersionCache = new WeakMap<
-  SocketIOClient.Socket,
-  number
->();
+// const httpStorageSceneVersionCache = new WeakMap<
+//   SocketIOClient.Socket,
+//   number
+// >();
 
 export const isSavedToHttpStorage = (
   portal: Portal,
@@ -73,7 +84,10 @@ export const saveToHttpStorage = async (
   const { ciphertext, iv } = await encryptElements(roomKey, elements);
 
   // Concatenate IV with encrypted data (IV does not have to be secret).
-  const payloadBlob = new Blob([iv.buffer, ciphertext]);
+  const payloadBlob = new Blob([
+    new ArrayBuffer(iv.buffer.byteLength),
+    ciphertext,
+  ]);
   const payload = await new Response(payloadBlob).arrayBuffer();
   const putResponse = await fetch(
     `${HTTP_STORAGE_BACKEND_URL}/rooms/${roomId}`,
@@ -94,7 +108,7 @@ export const saveToHttpStorage = async (
 export const loadFromHttpStorage = async (
   roomId: string,
   roomKey: string,
-  socket: SocketIOClient.Socket | null,
+  socket: Socket | null,
 ): Promise<readonly ExcalidrawElement[] | null> => {
   const HTTP_STORAGE_BACKEND_URL = await getEnv(
     EnvVar.HTTP_STORAGE_BACKEND_URL,
