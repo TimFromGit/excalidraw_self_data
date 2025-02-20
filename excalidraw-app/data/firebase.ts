@@ -22,103 +22,71 @@ import {
 import { MIME_TYPES } from "../../packages/excalidraw/constants";
 import type { SyncableExcalidrawElement } from ".";
 import { getSyncableElements } from ".";
-import type { ResolutionType } from "../../packages/excalidraw/utility-types";
 import type { Socket } from "socket.io-client";
 import type { RemoteExcalidrawElement } from "../../packages/excalidraw/data/reconcile";
-import { loadFilesFromStorage } from "./api";
-import { loadImagesFromStorage } from "./api.imgData";
+import { initializeApp } from "firebase/app";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  runTransaction,
+  Bytes,
+} from "firebase/firestore";
+import { getStorage, ref, uploadBytes } from "firebase/storage";
+import { EnvVar, getEnv } from "./config";
+
 
 // private
 // -----------------------------------------------------------------------------
 
-let FIREBASE_CONFIG: Record<string, any>;
-try {
-  FIREBASE_CONFIG = JSON.parse(import.meta.env.VITE_APP_FIREBASE_CONFIG);
-} catch (error: any) {
-  console.warn(
-    `Error JSON parsing firebase config. Supplied value: ${
-      import.meta.env.VITE_APP_FIREBASE_CONFIG
-    }`,
-  );
-  FIREBASE_CONFIG = {};
-}
+const FIREBASE_CONFIG: Record<string, any> = JSON.parse(
+  process.env.REACT_APP_FIREBASE_CONFIG || "{}",
+);
 
-let firebasePromise: Promise<typeof import("firebase/app").default> | null =
-  null;
-let firestorePromise: Promise<any> | null | true = null;
-let firebaseStoragePromise: Promise<any> | null | true = null;
+let firebaseApp: ReturnType<typeof initializeApp> | null = null;
+let firestore: ReturnType<typeof getFirestore> | null = null;
+let firebaseStorage: ReturnType<typeof getStorage> | null = null;
 
-let isFirebaseInitialized = false;
 
-const _loadFirebase = async () => {
-  const firebase = (
-    await import(/* webpackChunkName: "firebase" */ "firebase/app")
-  ).default;
+const storage = await getEnv(EnvVar.STORAGE_BACKEND);
+const useFirebase = storage === "firebase";
 
-  if (!isFirebaseInitialized) {
-    try {
-      firebase.initializeApp(FIREBASE_CONFIG);
-    } catch (error: any) {
-      // trying initialize again throws. Usually this is harmless, and happens
-      // mainly in dev (HMR)
-      if (error.code === "app/duplicate-app") {
-        console.warn(error.name, error.code);
-      } else {
-        throw error;
-      }
-    }
-    isFirebaseInitialized = true;
+//if (useFirebase && !isFirebaseInitialized) {
+
+const _initializeFirebase = () => {
+  if (useFirebase && !firebaseApp) {
+    firebaseApp = initializeApp(FIREBASE_CONFIG);
   }
-
-  return firebase;
+  return firebaseApp;
 };
 
-const _getFirebase = async (): Promise<
-  typeof import("firebase/app").default
-> => {
-  if (!firebasePromise) {
-    firebasePromise = _loadFirebase();
+const _getFirestore = () => {
+  if (useFirebase && !firestore) {
+    firestore = getFirestore(_initializeFirebase());
   }
-  return firebasePromise;
+  return firestore;
+};
+
+const _getStorage = () => {
+  if (useFirebase && !firebaseStorage) {
+    firebaseStorage = getStorage(_initializeFirebase());
+  }
+  return firebaseStorage;
 };
 
 // -----------------------------------------------------------------------------
 
-const loadFirestore = async () => {
-  const firebase = await _getFirebase();
-  if (!firestorePromise) {
-    firestorePromise = import(
-      /* webpackChunkName: "firestore" */ "firebase/firestore"
-    );
-  }
-  if (firestorePromise !== true) {
-    await firestorePromise;
-    firestorePromise = true;
-  }
-  return firebase;
-};
-
 export const loadFirebaseStorage = async () => {
-  const firebase = await _getFirebase();
-  if (!firebaseStoragePromise) {
-    firebaseStoragePromise = import(
-      /* webpackChunkName: "storage" */ "firebase/storage"
-    );
-  }
-  if (firebaseStoragePromise !== true) {
-    await firebaseStoragePromise;
-    firebaseStoragePromise = true;
-  }
-  return firebase;
+  return _getStorage();
 };
 
-interface FirebaseStoredScene {
+type FirebaseStoredScene = {
   sceneVersion: number;
-  iv: firebase.default.firestore.Blob;
-  ciphertext: firebase.default.firestore.Blob;
-}
+  iv: Bytes;
+  ciphertext: Bytes;
+};
 
-const encryptElements = async (
+export const encryptElements = async (
   key: string,
   elements: readonly ExcalidrawElement[],
 ): Promise<{ ciphertext: ArrayBuffer; iv: Uint8Array }> => {
@@ -129,7 +97,7 @@ const encryptElements = async (
   return { ciphertext: encryptedBuffer, iv };
 };
 
-const decryptElements = async (
+export const decryptElements = async (
   data: FirebaseStoredScene,
   roomKey: string,
 ): Promise<readonly ExcalidrawElement[]> => {
@@ -177,24 +145,18 @@ export const saveFilesToFirebase = async ({
   prefix: string;
   files: { id: FileId; buffer: Uint8Array }[];
 }) => {
-  const firebase = await loadFirebaseStorage();
+  const storage = await loadFirebaseStorage();
+
   const erroredFiles: FileId[] = [];
   const savedFiles: FileId[] = [];
 
   await Promise.all(
     files.map(async ({ id, buffer }) => {
       try {
-        await firebase
-          .storage()
-          .ref(`${prefix}/${id}`)
-          .put(
-            new Blob([buffer], {
-              type: MIME_TYPES.binary,
-            }),
-            {
-              cacheControl: `public, max-age=${FILE_CACHE_MAX_AGE_SEC}`,
-            },
-          );
+        const storageRef = ref(storage, `${prefix}/${id}`);
+        await uploadBytes(storageRef, buffer, {
+          cacheControl: `public, max-age=${FILE_CACHE_MAX_AGE_SEC}`,
+        });
         savedFiles.push(id);
       } catch (error: any) {
         erroredFiles.push(id);
@@ -205,21 +167,16 @@ export const saveFilesToFirebase = async ({
   return { savedFiles, erroredFiles };
 };
 
-const createFirebaseSceneDocument = async (//создание документа сцены в файрбейсе для ф-ии saveToFirebase
-  firebase: ResolutionType<typeof loadFirestore>,
+const createFirebaseSceneDocument = async (
   elements: readonly SyncableExcalidrawElement[],
   roomKey: string,
 ) => {
   const sceneVersion = getSceneVersion(elements);
   const { ciphertext, iv } = await encryptElements(roomKey, elements);
-  // debugger;
-
   return {
     sceneVersion,
-    ciphertext: firebase.firestore.Blob.fromUint8Array(
-      new Uint8Array(ciphertext),
-    ),
-    iv: firebase.firestore.Blob.fromUint8Array(iv),
+    ciphertext: Bytes.fromUint8Array(new Uint8Array(ciphertext)),
+    iv: Bytes.fromUint8Array(iv),
   } as FirebaseStoredScene;
 };
 
@@ -239,22 +196,15 @@ export const saveToFirebase = async (
     return null;
   }
 
-  const firebase = await loadFirestore();
-  const firestore = firebase.firestore();
+  const firestore = _getFirestore();
+  const docRef = doc(firestore, "scenes", roomId);
 
-  const docRef = firestore.collection("scenes").doc(roomId);
-
-  const storedScene = await firestore.runTransaction(async (transaction) => {
+  const storedScene = await runTransaction(firestore, async (transaction) => {
     const snapshot = await transaction.get(docRef);
-    // console.log("snapshot:");
-    // console.log(snapshot);
 
-    if (!snapshot.exists) {
-      const storedScene = await createFirebaseSceneDocument(
-        firebase,
-        elements,
-        roomKey,
-      );
+    if (!snapshot.exists()) {
+      const storedScene = await createFirebaseSceneDocument(elements, roomKey);
+
       transaction.set(docRef, storedScene);
 
       return storedScene;
@@ -273,49 +223,41 @@ export const saveToFirebase = async (
     );
 
     const storedScene = await createFirebaseSceneDocument(
-      firebase,
       reconciledElements,
       roomKey,
     );
 
     transaction.update(docRef, storedScene);
-    // console.log(storedScene);
 
     // Return the stored elements as the in memory `reconciledElements` could have mutated in the meantime
     return storedScene;
   });
 
-  const decryptedElements = await decryptElements(storedScene, roomKey);
-  // console.log("decryptedElements");
-  // console.log(decryptedElements);
+  const storedElements = getSyncableElements(
+    restoreElements(await decryptElements(storedScene, roomKey), null),
+  );
 
-  const restoredElements: any = restoreElements(decryptedElements, null);
-  // console.log("restoredElements");
-  // console.log(restoredElements);
+  FirebaseSceneVersionCache.set(socket, storedElements);
 
-  // const storedElements = getSyncableElements(restoredElements,);
-  // console.log("storedElements");
-  // console.log(storedElements);
-
-  //FirebaseSceneVersionCache.set(socket, storedElements);
-  FirebaseSceneVersionCache.set(socket, restoredElements);
-
-  //return storedElements;
-  return restoredElements;
+  return storedElements;
 };
 
-export const loadFromFirebase = async ( //переписан await, работа с фигурами
+export const loadFromFirebase = async (
   roomId: string,
   roomKey: string,
   socket: Socket | null,
 ): Promise<readonly SyncableExcalidrawElement[] | null> => {
-
-  const decryptedElements = await loadFilesFromStorage(); 
-  //debugger;
+  const firestore = _getFirestore();
+  const docRef = doc(firestore, "scenes", roomId);
+  const docSnap = await getDoc(docRef);
+  if (!docSnap.exists()) {
+    return null;
+  }
+  const storedScene = docSnap.data() as FirebaseStoredScene;
   const elements = getSyncableElements(
-    restoreElements(decryptedElements as any, null),
+    restoreElements(await decryptElements(storedScene, roomKey), null),
   );
-  //debugger;
+
   if (socket) {
     FirebaseSceneVersionCache.set(socket, elements);
   }
@@ -323,51 +265,49 @@ export const loadFromFirebase = async ( //переписан await, работа
   return elements;
 };
 
-export const loadFilesFromFirebase = async ( //Работа с изображениями
+export const loadFilesFromFirebase = async (
   prefix: string,
   decryptionKey: string,
   filesIds: readonly FileId[],
 ) => {
-  //const loadedFiles: BinaryFileData[] = [];
+  const loadedFiles: BinaryFileData[] = [];
   const erroredFiles = new Map<FileId, true>();
 
-  // await Promise.all(
-  //   [...new Set(filesIds)].map(async (id) => {
-  //     try {
-  //       const url = `https://firebasestorage.googleapis.com/v0/b/${
-  //         FIREBASE_CONFIG.storageBucket
-  //       }/o/${encodeURIComponent(prefix.replace(/^\//, ""))}%2F${id}`;
-  //       const response = await fetch(`${url}?alt=media`);
-  //       if (response.status < 400) {
-  //         const arrayBuffer = await response.arrayBuffer();
-  //         const { data, metadata } = await decompressData<BinaryFileMetadata>(
-  //           new Uint8Array(arrayBuffer),
-  //           {
-  //             decryptionKey,
-  //           },
-  //         );
+  await Promise.all(
+    [...new Set(filesIds)].map(async (id) => {
+      try {
+        const url = `https://firebasestorage.googleapis.com/v0/b/${
+          FIREBASE_CONFIG.storageBucket
+        }/o/${encodeURIComponent(prefix.replace(/^\//, ""))}%2F${id}`;
+        const response = await fetch(`${url}?alt=media`);
+        if (response.status < 400) {
+          const arrayBuffer = await response.arrayBuffer();
 
-  //         const dataURL = new TextDecoder().decode(data) as DataURL;
+          const { data, metadata } = await decompressData<BinaryFileMetadata>(
+            new Uint8Array(arrayBuffer),
+            {
+              decryptionKey,
+            },
+          );
 
-  //         loadedFiles.push({
-  //           mimeType: metadata.mimeType || MIME_TYPES.binary,
-  //           id,
-  //           dataURL,
-  //           created: metadata?.created || Date.now(),
-  //           lastRetrieved: metadata?.created || Date.now(),
-  //         });
-  //       } else {
-  //         erroredFiles.set(id, true);
-  //       }
-  //     } catch (error: any) {
-  //       erroredFiles.set(id, true);
-  //       console.error(error);
-  //     }
-  //   }),
-  // );
-  const loadedFiles = await loadImagesFromStorage();
+          const dataURL = new TextDecoder().decode(data) as DataURL;
 
-  console.log("loadedFiles");
-  console.log(loadedFiles);
+          loadedFiles.push({
+            mimeType: metadata.mimeType || MIME_TYPES.binary,
+            id,
+            dataURL,
+            created: metadata?.created || Date.now(),
+            lastRetrieved: metadata?.created || Date.now(),
+          });
+        } else {
+          erroredFiles.set(id, true);
+        }
+      } catch (error: any) {
+        erroredFiles.set(id, true);
+        console.error(error);
+      }
+    }),
+  );
+
   return { loadedFiles, erroredFiles };
 };

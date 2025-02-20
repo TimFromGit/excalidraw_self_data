@@ -29,6 +29,8 @@ import { useLibraryCache } from "../hooks/useLibraryItemSvg";
 
 import "./LibraryMenuItems.scss";
 
+import { EnvVar, getEnv } from "../../../excalidraw-app/data/config";
+
 // using an odd number of items per batch so the rendering creates an irregular
 // pattern which looks more organic
 const ITEMS_RENDERED_PER_BATCH = 17;
@@ -202,6 +204,18 @@ export default function LibraryMenuItems({
     svgCache.size >= libraryItems.length
       ? CACHED_ITEMS_RENDERED_PER_BATCH
       : ITEMS_RENDERED_PER_BATCH;
+
+
+      const [libraryUrl, setLibraryUrl] = useState("");
+      const getLibraryUrl = async () => {
+        const LIBRARY_URL = await getEnv(EnvVar.LIBRARY_URL);
+        setLibraryUrl(LIBRARY_URL);
+      };
+      useEffect(() => {
+        if (!libraryUrl) {
+          getLibraryUrl();
+        }
+      });
 
   return (
     <div

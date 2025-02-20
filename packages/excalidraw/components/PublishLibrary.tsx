@@ -22,6 +22,7 @@ import DialogActionButton from "./DialogActionButton";
 import { CloseIcon } from "./icons";
 import { ToolButton } from "./ToolButton";
 import { EditorLocalStorage } from "../data/EditorLocalStorage";
+import { EnvVar, getEnv } from "../../../excalidraw-app/data/config";
 
 import "./PublishLibrary.scss";
 
@@ -297,7 +298,9 @@ const PublishLibrary = ({
     formData.append("twitterHandle", libraryData.twitterHandle);
     formData.append("website", libraryData.website);
 
-    fetch(`${import.meta.env.VITE_APP_LIBRARY_BACKEND}/submit`, {
+    const LIBRARY_BACKEND = await getEnv(EnvVar.LIBRARY_BACKEND);
+
+    fetch(`${LIBRARY_BACKEND}/submit`, {
       method: "post",
       body: formData,
     })

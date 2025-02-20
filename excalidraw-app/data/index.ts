@@ -35,7 +35,9 @@ import {
   ROOM_ID_BYTES,
 } from "../app_constants";
 import { encodeFilesForUpload } from "./FileManager";
-import { saveFilesToFirebase } from "./firebase";
+//import { saveFilesToFirebase } from "./firebase";
+import { EnvVar, getEnv, getStorageBackend } from "./config";
+
 
 export type SyncableExcalidrawElement = OrderedExcalidrawElement &
   MakeBrand<"SyncableExcalidrawElement">;
@@ -59,8 +61,8 @@ export const getSyncableElements = (
     isSyncableElement(element),
   ) as SyncableExcalidrawElement[];
 
-const BACKEND_V2_GET = import.meta.env.VITE_APP_BACKEND_V2_GET_URL;
-const BACKEND_V2_POST = import.meta.env.VITE_APP_BACKEND_V2_POST_URL;
+// const BACKEND_V2_GET = import.meta.env.VITE_APP_BACKEND_V2_GET_URL;
+// const BACKEND_V2_POST = import.meta.env.VITE_APP_BACKEND_V2_POST_URL;
 
 const generateRoomId = async () => {
   const buffer = new Uint8Array(ROOM_ID_BYTES);
@@ -201,6 +203,8 @@ const importFromBackend = async (
   decryptionKey: string,
 ): Promise<ImportedDataState> => {
   try {
+    const BACKEND_V2_GET = await getEnv(EnvVar.BACKEND_V2_GET_URL);
+
     const response = await fetch(`${BACKEND_V2_GET}${id}`);
 
     if (!response.ok) {
@@ -303,6 +307,7 @@ export const exportToBackend = async (
       encryptionKey,
       maxBytes: FILE_UPLOAD_MAX_BYTES,
     });
+    const BACKEND_V2_POST = await getEnv(EnvVar.BACKEND_V2_POST_URL);
 
     const response = await fetch(BACKEND_V2_POST, {
       method: "POST",
@@ -316,7 +321,8 @@ export const exportToBackend = async (
       url.hash = `json=${json.id},${encryptionKey}`;
       const urlString = url.toString();
 
-      await saveFilesToFirebase({
+      const storageBackend = await getStorageBackend();
+      await storageBackend.saveFilesToStorageBackend({
         prefix: `/files/shareLinks/${json.id}`,
         files: filesToUpload,
       });
