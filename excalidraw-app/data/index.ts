@@ -38,7 +38,6 @@ import { encodeFilesForUpload } from "./FileManager";
 //import { saveFilesToFirebase } from "./firebase";
 import { EnvVar, getEnv, getStorageBackend } from "./config";
 
-
 export type SyncableExcalidrawElement = OrderedExcalidrawElement &
   MakeBrand<"SyncableExcalidrawElement">;
 

@@ -14,6 +14,7 @@ import {
 import { loadFromBlob } from "../packages/excalidraw/data/blob";
 import type {
   FileId,
+  FractionalIndex,
   NonDeletedExcalidrawElement,
   OrderedExcalidrawElement,
 } from "../packages/excalidraw/element/types";
@@ -308,7 +309,12 @@ const initializeScene = async (opts: {
           isLoading: false,
         },
         elements: reconcileElements(
-          scene?.elements || [],
+          scene?.elements
+            ? scene.elements.map((element) => ({
+                ...element,
+                index: element.index ?? ("" as FractionalIndex),
+              }))
+            : [],
           excalidrawAPI.getSceneElementsIncludingDeleted() as RemoteExcalidrawElement[],
           excalidrawAPI.getAppState(),
         ),
@@ -443,20 +449,32 @@ const ExcalidrawWrapper = () => {
           //     elements: excalidrawAPI.getSceneElementsIncludingDeleted(),
           getStorageBackend()
             .then((storageBackend) => {
+              if (!storageBackend) {
+                // Handle the case where storageBackend is null
+                console.error("Storage backend is not available");
+                return;
+              }
               return storageBackend.loadFilesFromStorageBackend(
                 `${FIREBASE_STORAGE_PREFIXES.shareLinkFiles}/${data.id}`,
                 data.key,
                 fileIds,
               );
             })
-            .then(({ loadedFiles, erroredFiles }) => {
-              excalidrawAPI.addFiles(loadedFiles);
-              updateStaleImageStatuses({
-                excalidrawAPI,
-                erroredFiles,
-                elements: excalidrawAPI.getSceneElementsIncludingDeleted(),
-              });
-              // });
+            .then((result) => {
+              const loadedFiles = result?.loadedFiles;
+              const erroredFiles = result?.erroredFiles;
+              if (loadedFiles && erroredFiles) {
+                excalidrawAPI.addFiles(loadedFiles);
+                updateStaleImageStatuses({
+                  excalidrawAPI,
+                  erroredFiles,
+                  elements: excalidrawAPI.getSceneElementsIncludingDeleted(),
+                });
+              } else {
+                console.error(
+                  "Нет результата от storageBackend.loadFilesFromStorageBackend",
+                );
+              }
             });
         } else if (isInitialLoad) {
           if (fileIds.length) {

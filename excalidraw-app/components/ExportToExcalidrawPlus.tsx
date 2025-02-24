@@ -1,8 +1,11 @@
 import React from "react";
 import { Card } from "../../packages/excalidraw/components/Card";
 import { ToolButton } from "../../packages/excalidraw/components/ToolButton";
-import { serializeAsJSON } from "../../packages/excalidraw/data/json";
-import { loadFirebaseStorage, saveFilesToFirebase } from "../data/firebase";
+// import { serializeAsJSON } from "../../packages/excalidraw/data/json";
+import {
+  // loadFirebaseStorage,
+  saveFilesToHttpStorage,
+} from "../data/httpStorage";
 import type {
   FileId,
   NonDeletedExcalidrawElement,
@@ -15,16 +18,18 @@ import type {
 import { nanoid } from "nanoid";
 import { useI18n } from "../../packages/excalidraw/i18n";
 import {
-  encryptData,
+  // encryptData,
   generateEncryptionKey,
 } from "../../packages/excalidraw/data/encryption";
 import { isInitializedImageElement } from "../../packages/excalidraw/element/typeChecks";
 import { FILE_UPLOAD_MAX_BYTES } from "../app_constants";
 import { encodeFilesForUpload } from "../data/FileManager";
-import { MIME_TYPES } from "../../packages/excalidraw/constants";
+// import { MIME_TYPES } from "../../packages/excalidraw/constants";
 import { trackEvent } from "../../packages/excalidraw/analytics";
 import { getFrame } from "../../packages/excalidraw/utils";
 import { ExcalidrawLogo } from "../../packages/excalidraw/components/ExcalidrawLogo";
+// import { getStorageBackend } from "../data/config";
+// import type { StorageBackend } from "../data/StorageBackend";
 
 export const exportToExcalidrawPlus = async (
   elements: readonly NonDeletedExcalidrawElement[],
@@ -32,32 +37,38 @@ export const exportToExcalidrawPlus = async (
   files: BinaryFiles,
   name: string,
 ) => {
-  const firebase = await loadFirebaseStorage();
+  // const firebase = await loadFirebaseStorage();
+  // const storageBackend: StorageBackend | null = await getStorageBackend();
 
   const id = `${nanoid(12)}`;
 
   const encryptionKey = (await generateEncryptionKey())!;
-  const encryptedData = await encryptData(
-    encryptionKey,
-    serializeAsJSON(elements, appState, files, "database"),
-  );
+  // const encryptedData = await encryptData(
+  //   encryptionKey,
+  //   serializeAsJSON(elements, appState, files, "database"),
+  // );
 
-  const blob = new Blob(
-    [encryptedData.iv, new Uint8Array(encryptedData.encryptedBuffer)],
-    {
-      type: MIME_TYPES.binary,
-    },
-  );
+  // const blob = new Blob(
+  //   [encryptedData.iv, new Uint8Array(encryptedData.encryptedBuffer)],
+  //   {
+  //     type: MIME_TYPES.binary,
+  //   },
+  // );
 
-  await firebase
-    .storage()
-    .ref(`/migrations/scenes/${id}`)
-    .put(blob, {
-      customMetadata: {
-        data: JSON.stringify({ version: 2, name }),
-        created: Date.now().toString(),
-      },
-    });
+  // if (storageBackend) {
+  //   await storageBackend
+  //     .storage()
+  //     .ref(`/migrations/scenes/${id}`)
+  //     .put(blob, {
+  //       customMetadata: {
+  //         data: JSON.stringify({ version: 2, name }),
+  //         created: Date.now().toString(),
+  //       },
+  //     });
+  // } else {
+  //   // handle the case where storageBackend is null
+  //   console.error("Storage backend is not initialized");
+  // }
 
   const filesMap = new Map<FileId, BinaryFileData>();
   for (const element of elements) {
@@ -73,7 +84,7 @@ export const exportToExcalidrawPlus = async (
       maxBytes: FILE_UPLOAD_MAX_BYTES,
     });
 
-    await saveFilesToFirebase({
+    await saveFilesToHttpStorage({
       prefix: `/migrations/files/scenes/${id}`,
       files: filesToUpload,
     });

@@ -158,6 +158,9 @@ class Collab extends PureComponent<CollabProps, CollabState> {
         }
 
         const storageBackend = await getStorageBackend();
+        if (!storageBackend) {
+          throw new Error("Storage backend is not available");
+        }
         return storageBackend.loadFilesFromStorageBackend(
           `files/rooms/${roomId}`,
           roomKey,
@@ -169,7 +172,11 @@ class Collab extends PureComponent<CollabProps, CollabState> {
         if (!roomId || !roomKey) {
           throw new AbortError();
         }
+
         const storageBackend = await getStorageBackend();
+        if (!storageBackend) {
+          throw new Error("Storage backend is not available");
+        }
         const { savedFiles, erroredFiles } =
           await storageBackend.saveFilesToStorageBackend({
             prefix: `${FIREBASE_STORAGE_PREFIXES.collabFiles}/${roomId}`,
@@ -317,7 +324,7 @@ class Collab extends PureComponent<CollabProps, CollabState> {
   ) => {
     try {
       const storageBackend = await getStorageBackend();
-      storageBackend.saveToStorageBackend(this.portal, syncableElements);
+      storageBackend?.saveToStorageBackend(this.portal, syncableElements);
 
       // const storedElements = await saveToFirebase(
       //   this.portal,
@@ -724,7 +731,7 @@ class Collab extends PureComponent<CollabProps, CollabState> {
 
       try {
         const storageBackend = await getStorageBackend();
-        const elements = await storageBackend.loadFromStorageBackend(
+        const elements = await storageBackend?.loadFromStorageBackend(
           roomLinkData.roomId,
           roomLinkData.roomKey,
           this.portal.socket,

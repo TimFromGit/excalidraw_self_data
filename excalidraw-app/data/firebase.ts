@@ -1,8 +1,8 @@
 // import { reconcileElements } from "../../packages/excalidraw";
 import type {
   ExcalidrawElement,
-  FileId,
-  OrderedExcalidrawElement,
+  // FileId,
+  // OrderedExcalidrawElement,
 } from "../../packages/excalidraw/element/types";
 // import { getSceneVersion } from "../../packages/excalidraw/element";
 // import type Portal from "../collab/Portal";
@@ -29,7 +29,6 @@ import {
 // import { getStorage, ref, uploadBytes } from "firebase/storage";
 // import { EnvVar, getEnv } from "./config";
 
-
 // // private
 // // -----------------------------------------------------------------------------
 
@@ -40,7 +39,6 @@ import {
 // let firebaseApp: ReturnType<typeof initializeApp> | null = null;
 // let firestore: ReturnType<typeof getFirestore> | null = null;
 // let firebaseStorage: ReturnType<typeof getStorage> | null = null;
-
 
 // const storage = await getEnv(EnvVar.STORAGE_BACKEND);
 // const useFirebase = storage === "firebase";
@@ -74,11 +72,11 @@ import {
 //   return _getStorage();
 // };
 
-type FirebaseStoredScene = {
-  sceneVersion: number;
-  iv: Uint8Array;
-  ciphertext: Uint8Array;
-};
+// type FirebaseStoredScene = {
+//   sceneVersion: number;
+//   iv: Uint8Array;
+//   ciphertext: Uint8Array;
+// };
 
 export const encryptElements = async (
   key: string,
@@ -93,21 +91,15 @@ export const encryptElements = async (
 
 export const decryptElements = async (
   key: string,
-  p0: Uint8Array<ArrayBuffer>,
-  p1: Uint8Array<ArrayBuffer>,
-  data: FirebaseStoredScene,
-  roomKey: string,
+  iv: Uint8Array,
+  ciphertext: ArrayBuffer | Uint8Array,
 ): Promise<readonly ExcalidrawElement[]> => {
-  const ciphertext = data.ciphertext;
-  const iv = data.iv;
-
-  const decrypted = await decryptData(iv, ciphertext, roomKey);
+  const decrypted = await decryptData(iv, ciphertext, key);
   const decodedData = new TextDecoder("utf-8").decode(
     new Uint8Array(decrypted),
   );
   return JSON.parse(decodedData);
 };
-
 // class FirebaseSceneVersionCache {
 //   private static cache = new WeakMap<Socket, number>();
 //   static get = (socket: Socket) => {
