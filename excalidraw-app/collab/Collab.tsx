@@ -325,7 +325,6 @@ class Collab extends PureComponent<CollabProps, CollabState> {
     try {
       const storageBackend = await getStorageBackend();
       storageBackend?.saveToStorageBackend(this.portal, syncableElements);
-
       // const storedElements = await saveToFirebase(
       //   this.portal,
       //   syncableElements,
