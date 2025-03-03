@@ -82,7 +82,6 @@ export const decryptData = async (
   privateKey: string,
 ): Promise<ArrayBuffer> => {
   const key = await getCryptoKey(privateKey, "decrypt");
-  debugger
   const decryptedData = window.crypto.subtle.decrypt(
     {
       name: "AES-GCM",
@@ -91,6 +90,6 @@ export const decryptData = async (
     key,
     encrypted,
   );
-  debugger;
+  // debugger;
   return decryptedData;
 };

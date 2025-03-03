@@ -37,11 +37,14 @@ export const isSavedToHttpStorage = (
 ): boolean => {
   if (portal.socket && portal.roomId && portal.roomKey) {
     const sceneVersion = getSceneVersion(elements);
+    let a = httpStorageSceneVersionCache.get(portal.socket) === sceneVersion;
+    debugger;
+
     return httpStorageSceneVersionCache.get(portal.socket) === sceneVersion;
   }
   // if no room exists, consider the room saved so that we don't unnecessarily
   // prevent unload (there's nothing we could do at that point anyway)
-  debugger;
+  // debugger;
   return true;
 };
 
@@ -58,6 +61,7 @@ export const saveToHttpStorage = async (
     !socket ||
     isSavedToHttpStorage(portal, elements)
   ) {
+    debugger;
     return true;
   }
 
@@ -85,7 +89,7 @@ export const saveToHttpStorage = async (
     //debugger;
 
     const existingElements = await getElementsFromBuffer(buffer, roomKey);
-    debugger;
+    // debugger;
     if (getSceneVersion(existingElements) >= sceneVersion) {
       return false;
     }
@@ -115,7 +119,7 @@ export const saveToHttpStorage = async (
       body: payload,
     },
   );
-  debugger;
+  // debugger;
 
   if (putResponse.ok) {
     httpStorageSceneVersionCache.set(socket, sceneVersion);
@@ -138,7 +142,7 @@ export const loadFromHttpStorage = async (
     `${HTTP_STORAGE_BACKEND_URL}/rooms/${roomId}`,
   );
   const buffer = await getResponse.arrayBuffer();
-  debugger;
+  // debugger;
   const elements = await getElementsFromBuffer(buffer, roomKey);
 
   if (socket) {
@@ -155,10 +159,12 @@ const decryptElements = async (
 ): Promise<readonly ExcalidrawElement[]> => {
   // const ciphertext2 = ciphertext.toUint8Array();
   const decrypted = await decryptData(iv, ciphertext as Uint8Array, key);
-  const decodedData = new TextDecoder("utf-8").decode(
-    new Uint8Array(decrypted),
-  );
-  debugger;
+  // debugger;
+  const forDecoder = new Uint8Array(decrypted);
+  // debugger;
+
+  const decodedData = new TextDecoder("utf-8").decode(forDecoder);
+  // debugger;
 
   return JSON.parse(decodedData);
 };
@@ -180,15 +186,16 @@ const getElementsFromBuffer = async (
   key: string,
 ): Promise<readonly ExcalidrawElement[]> => {
   // Buffer should contain both the IV (fixed length) and encrypted data
-  const iv = buffer.slice(0, IV_LENGTH_BYTES);
-  //const iv2 = new Uint8Array(buffer);
-  debugger;
+  // const iv = buffer.slice(0, IV_LENGTH_BYTES);
+  const iv2 = new Uint8Array(buffer);
+  // debugger;
   const encrypted = buffer.slice(IV_LENGTH_BYTES, buffer.byteLength);
   // const ivUnit8Array = new Uint8Array(iv);
-  debugger;
+  // debugger;
 
   const decryptedElements = await decryptElements(
-    new Uint8Array(iv),
+    //new Uint8Array(iv),
+    iv2,
     encrypted,
     key,
   );
