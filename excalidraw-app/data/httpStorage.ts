@@ -19,17 +19,13 @@ import type {
 import type Portal from "../collab/Portal";
 import { EnvVar, getEnv } from "./config";
 import type { Socket } from "socket.io-client";
-
 // ...
 
-const httpStorageSceneVersionCache = new WeakMap<Socket, number>();
+//const httpStorageSceneVersionCache = new WeakMap<Socket, number>();
 // There is a lot of intentional duplication with the firebase file
 // to prevent modifying upstream files and ease futur maintenance of this fork
 
-// const httpStorageSceneVersionCache = new WeakMap<
-//   SocketIOClient.Socket,
-//   number
-// >();
+const httpStorageSceneVersionCache = new WeakMap<Socket, number>();
 
 export const isSavedToHttpStorage = (
   portal: Portal,
@@ -37,14 +33,10 @@ export const isSavedToHttpStorage = (
 ): boolean => {
   if (portal.socket && portal.roomId && portal.roomKey) {
     const sceneVersion = getSceneVersion(elements);
-    let a = httpStorageSceneVersionCache.get(portal.socket) === sceneVersion;
-    debugger;
-
     return httpStorageSceneVersionCache.get(portal.socket) === sceneVersion;
   }
   // if no room exists, consider the room saved so that we don't unnecessarily
   // prevent unload (there's nothing we could do at that point anyway)
-  // debugger;
   return true;
 };
 
@@ -53,6 +45,7 @@ export const saveToHttpStorage = async (
   elements: readonly ExcalidrawElement[],
 ) => {
   const { roomId, roomKey, socket } = portal;
+
   if (
     // if no room exists, consider the room saved because there's nothing we can
     // do at this point
@@ -61,7 +54,6 @@ export const saveToHttpStorage = async (
     !socket ||
     isSavedToHttpStorage(portal, elements)
   ) {
-    debugger;
     return true;
   }
 
@@ -84,33 +76,17 @@ export const saveToHttpStorage = async (
 
   if (getResponse.ok) {
     const buffer = await getResponse.arrayBuffer();
-    // const buffer2 = await getResponse.json();
-    // const buffer3 = await getResponse?.body?.getReader();
-    //debugger;
 
     const existingElements = await getElementsFromBuffer(buffer, roomKey);
-    // debugger;
     if (getSceneVersion(existingElements) >= sceneVersion) {
       return false;
     }
   }
-  const encryptElements = async (
-    key: string,
-    elements: readonly ExcalidrawElement[],
-  ): Promise<{ ciphertext: ArrayBuffer; iv: Uint8Array }> => {
-    const json = JSON.stringify(elements);
-    const encoded = new TextEncoder().encode(json);
-    const { encryptedBuffer, iv } = await encryptData(key, encoded);
 
-    return { ciphertext: encryptedBuffer, iv };
-  };
   const { ciphertext, iv } = await encryptElements(roomKey, elements);
 
   // Concatenate IV with encrypted data (IV does not have to be secret).
-  const payloadBlob = new Blob([
-    new ArrayBuffer(iv.buffer.byteLength),
-    ciphertext,
-  ]);
+  const payloadBlob = new Blob([iv.buffer as ArrayBuffer, ciphertext]);
   const payload = await new Response(payloadBlob).arrayBuffer();
   const putResponse = await fetch(
     `${HTTP_STORAGE_BACKEND_URL}/rooms/${roomId}`,
@@ -119,7 +95,6 @@ export const saveToHttpStorage = async (
       body: payload,
     },
   );
-  // debugger;
 
   if (putResponse.ok) {
     httpStorageSceneVersionCache.set(socket, sceneVersion);
@@ -138,11 +113,8 @@ export const loadFromHttpStorage = async (
     EnvVar.HTTP_STORAGE_BACKEND_URL,
   );
 
-  const getResponse = await fetch(
-    `${HTTP_STORAGE_BACKEND_URL}/rooms/${roomId}`,
-  );
-  const buffer = await getResponse.arrayBuffer();
-  // debugger;
+  const response = await fetch(`${HTTP_STORAGE_BACKEND_URL}/rooms/${roomId}`);
+  const buffer = await response.arrayBuffer();
   const elements = await getElementsFromBuffer(buffer, roomKey);
 
   if (socket) {
@@ -158,13 +130,10 @@ const decryptElements = async (
   key: string,
 ): Promise<readonly ExcalidrawElement[]> => {
   // const ciphertext2 = ciphertext.toUint8Array();
-  const decrypted = await decryptData(iv, ciphertext as Uint8Array, key);
-  // debugger;
+  const decrypted = await decryptData(iv, ciphertext, key);
   const forDecoder = new Uint8Array(decrypted);
-  // debugger;
 
   const decodedData = new TextDecoder("utf-8").decode(forDecoder);
-  // debugger;
 
   return JSON.parse(decodedData);
 };
@@ -186,23 +155,28 @@ const getElementsFromBuffer = async (
   key: string,
 ): Promise<readonly ExcalidrawElement[]> => {
   // Buffer should contain both the IV (fixed length) and encrypted data
-  // const iv = buffer.slice(0, IV_LENGTH_BYTES);
-  const iv2 = new Uint8Array(buffer);
-  // debugger;
+  const iv = buffer.slice(0, IV_LENGTH_BYTES);
+  //const iv2 = new Uint8Array(buffer);
   const encrypted = buffer.slice(IV_LENGTH_BYTES, buffer.byteLength);
-  // const ivUnit8Array = new Uint8Array(iv);
-  // debugger;
 
   const decryptedElements = await decryptElements(
-    //new Uint8Array(iv),
-    iv2,
-    encrypted,
+    new Uint8Array(iv),
+    new Uint8Array(encrypted),
     key,
   );
 
   return decryptedElements;
 };
+const encryptElements = async (
+  key: string,
+  elements: readonly ExcalidrawElement[],
+): Promise<{ ciphertext: ArrayBuffer; iv: Uint8Array }> => {
+  const json = JSON.stringify(elements);
+  const encoded = new TextEncoder().encode(json);
+  const { encryptedBuffer, iv } = await encryptData(key, encoded);
 
+  return { ciphertext: encryptedBuffer, iv };
+};
 export const saveFilesToHttpStorage = async ({
   prefix,
   files,

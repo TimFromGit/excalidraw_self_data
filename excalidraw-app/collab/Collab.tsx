@@ -314,7 +314,6 @@ class Collab extends PureComponent<CollabProps, CollabState> {
       // this won't run in time if user decides to leave the site, but
       //  the purpose is to run in immediately after user decides to stay
       this.saveCollabRoomToFirebase(syncableElements);
-
       preventUnload(event);
     }
   });
@@ -460,7 +459,6 @@ class Collab extends PureComponent<CollabProps, CollabState> {
   ): Promise<ValueOf<SocketUpdateDataSource>> => {
     try {
       const decrypted = await decryptData(iv, encryptedData, decryptionKey);
-
       const decodedData = new TextDecoder("utf-8").decode(
         new Uint8Array(decrypted),
       );
@@ -521,6 +519,7 @@ class Collab extends PureComponent<CollabProps, CollabState> {
     );
 
     const fallbackInitializationHandler = () => {
+      console.error("Unable to connect to socket server, falling back");
       this.initializeRoom({
         roomLinkData: existingRoomLinkData,
         fetchScene: true,
@@ -532,16 +531,14 @@ class Collab extends PureComponent<CollabProps, CollabState> {
 
     try {
       const SOCKET_SERVER = await getEnv(EnvVar.SOCKET_SERVER_URL);
+      console.info("Connecting to socket server: ", SOCKET_SERVER);
 
-      this.portal.socket = this.portal.open(
-        socketIOClient(SOCKET_SERVER, {
-          transports: ["websocket", "polling"],
-        }),
-        roomId,
-        roomKey,
-      );
+      const socket = socketIOClient(SOCKET_SERVER, {
+        transports: ["websocket", "polling"],
+      });
+      this.portal.socket = this.portal.open(socket, roomId, roomKey);
 
-      this.portal.socket.once("connect_error", fallbackInitializationHandler);
+      socket.once("connect_error", fallbackInitializationHandler);
     } catch (error: any) {
       console.error(error);
       this.setErrorDialog(error.message);
@@ -747,7 +744,7 @@ class Collab extends PureComponent<CollabProps, CollabState> {
         }
       } catch (error: any) {
         // log the error and move on. other peers will sync us the scene.
-        console.error(error);
+        console.error("Here", error);
       } finally {
         this.portal.socketInitialized = true;
       }

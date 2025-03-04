@@ -228,21 +228,18 @@ export const UserList = React.memo(
                     placeholder={t("userList.empty")}
                   >
                     {/* The list checks for `Children.count()`, hence defensively returning empty list */}
-                    {filteredCollaborators.length > 0
-                      ? [
-                          <div className="hint">{t("userList.hint.text")}</div>,
-                          filteredCollaborators.map((collaborator) =>
-                            renderCollaborator({
-                              actionManager,
-                              collaborator,
-                              socketId: collaborator.socketId,
-                              withName: true,
-                              isBeingFollowed:
-                                collaborator.socketId === userToFollow,
-                            }),
-                          ),
-                        ]
-                      : []}
+                    {filteredCollaborators.length > 0 && (
+                      <div className="hint">{t("userList.hint.text")}</div>
+                    )}
+                    {filteredCollaborators.map((collaborator) =>
+                      renderCollaborator({
+                        actionManager,
+                        collaborator,
+                        socketId: collaborator.socketId,
+                        withName: true,
+                        isBeingFollowed: collaborator.socketId === userToFollow,
+                      }),
+                    )}
                   </ScrollableList>
                   <Popover.Arrow
                     width={20}

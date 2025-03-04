@@ -18,12 +18,12 @@ import { trackEvent } from "../../packages/excalidraw/analytics";
 import throttle from "lodash.throttle";
 import { newElementWith } from "../../packages/excalidraw/element/mutateElement";
 import { encryptData } from "../../packages/excalidraw/data/encryption";
-import type { Socket } from "socket.io-client";
+import type * as SocketIOClient from "socket.io-client";
 import { StoreAction } from "../../packages/excalidraw";
 
 class Portal {
   collab: TCollabClass;
-  socket: Socket | null = null;
+  socket: SocketIOClient.Socket | null = null;
   socketInitialized: boolean = false; // we don't want the socket to emit any updates until it is fully initialized
   roomId: string | null = null;
   roomKey: string | null = null;
@@ -33,11 +33,11 @@ class Portal {
     this.collab = collab;
   }
 
-  open(socket: Socket, id: string, key: string) {
+  open(socket: SocketIOClient.Socket, id: string, key: string) {
+    console.info("Opening socket");
     this.socket = socket;
     this.roomId = id;
     this.roomKey = key;
-
     // Initialize socket listeners
     this.socket.on("init-room", () => {
       if (this.socket) {
@@ -55,7 +55,6 @@ class Portal {
     this.socket.on("room-user-change", (clients: SocketId[]) => {
       this.collab.setCollaborators(clients);
     });
-
     return socket;
   }
 
