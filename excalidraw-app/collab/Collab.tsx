@@ -47,13 +47,6 @@ import {
   getCollaborationLink,
   getSyncableElements,
 } from "../data";
-// import {
-//   isSavedToFirebase,
-//   loadFilesFromFirebase,
-//   loadFromFirebase,
-//   saveFilesToFirebase,
-//   saveToFirebase,
-// } from "../data/firebase";
 import {
   EnvVar,
   getEnv,
@@ -324,11 +317,6 @@ class Collab extends PureComponent<CollabProps, CollabState> {
     try {
       const storageBackend = await getStorageBackend();
       storageBackend?.saveToStorageBackend(this.portal, syncableElements);
-      // const storedElements = await saveToFirebase(
-      //   this.portal,
-      //   syncableElements,
-      //   this.excalidrawAPI.getAppState(),
-      // );
 
       this.resetErrorIndicator();
 
@@ -502,11 +490,6 @@ class Collab extends PureComponent<CollabProps, CollabState> {
       );
     }
 
-    // TODO: `ImportedDataState` type here seems abused
-    // const scenePromise = resolvablePromise<
-    //   | (ImportedDataState & { elements: readonly OrderedExcalidrawElement[] })
-    //   | null
-    // >();
     const scenePromise = resolvablePromise<
       (ImportedDataState & { elements: readonly ExcalidrawElement[] }) | null
     >();

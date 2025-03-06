@@ -129,7 +129,6 @@ const decryptElements = async (
   ciphertext: ArrayBuffer | Uint8Array,
   key: string,
 ): Promise<readonly ExcalidrawElement[]> => {
-  // const ciphertext2 = ciphertext.toUint8Array();
   const decrypted = await decryptData(iv, ciphertext, key);
   const forDecoder = new Uint8Array(decrypted);
 
@@ -137,26 +136,12 @@ const decryptElements = async (
 
   return JSON.parse(decodedData);
 };
-// const decryptElements2 = async (
-//   data: FirebaseStoredScene,
-//   roomKey: string,
-// ): Promise<readonly ExcalidrawElement[]> => {
-//   const ciphertext = data.ciphertext.toUint8Array();
-//   const iv = data.iv.toUint8Array();
-
-//   const decrypted = await decryptData(iv, ciphertext, roomKey);
-//   const decodedData = new TextDecoder("utf-8").decode(
-//     new Uint8Array(decrypted),
-//   );
-//   return JSON.parse(decodedData);
-// };
 const getElementsFromBuffer = async (
   buffer: ArrayBuffer,
   key: string,
 ): Promise<readonly ExcalidrawElement[]> => {
   // Buffer should contain both the IV (fixed length) and encrypted data
   const iv = buffer.slice(0, IV_LENGTH_BYTES);
-  //const iv2 = new Uint8Array(buffer);
   const encrypted = buffer.slice(IV_LENGTH_BYTES, buffer.byteLength);
 
   const decryptedElements = await decryptElements(
